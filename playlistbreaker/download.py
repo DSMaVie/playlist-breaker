@@ -1,13 +1,15 @@
 import logging
-from pathlib import Path
+import tempfile
 
 from pytube import Stream, YouTube
 from rich.progress import Progress
 
+from playlistbreaker.enums import FileType
+
 logger = logging.getLogger(__name__)
 
 
-def update_progress(
+def _update_progress(
     progress: Progress,
     task_id: str,
     stream: Stream,
@@ -24,20 +26,19 @@ def update_progress(
     )
 
 
-def download(link: str, loc: Path):
-    loc = loc.resolve()
-
+def download(link: str, format: FileType = FileType.MP4):
     with Progress() as progress:
         task_id = progress.add_task(description="Downloading Audio:")
 
         yt = YouTube(
             link,
-            on_progress_callback=lambda stream, chunk, rem_bytes: update_progress(
+            on_progress_callback=lambda stream, chunk, rem_bytes: _update_progress(
                 progress, task_id, stream, chunk, rem_bytes
             ),
         )
-        stream = yt.streams.get_audio_only()
+        stream = yt.streams.get_audio_only(subtype=format.value)
         logger.info(f"found stream {stream}")
 
-        stream.download(output_path=str(loc.parent), filename=str(loc.name))
-    
+        loc = tempfile.mkdtemp()
+        stream.download(output_path=loc, filename=f"{yt.title}.{format.value}")
+    return loc
